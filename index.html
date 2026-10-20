@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой бюджет</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="main.js" defer></script>
+</head>
+<body>
+
+    <div class="container">
+        <h1>💰 Семейный бюджет</h1>
+
+        <!-- Баланс -->
+        <div class="budget">Загрузка...</div>
+
+        <!-- Кнопки -->
+        <div class="actions">
+            <button id="incomeBtn" class="btn btn-income">➕ Пополнить</button>
+            <button id="withdrawBtn" class="btn btn-withdraw">➖ Снять</button>
+        </div>
+
+        <!-- Модальное окно -->
+        <div id="modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="modalTitle">Пополнить</h2>
+                <label for="amountInput">Сумма ($):</label>
+                <input type="number" id="amountInput" placeholder="0.00" step="0.01" min="0">
+                <div class="modal-buttons">
+                    <button id="cancelBtn" class="btn btn-cancel">Отмена</button>
+                    <button id="confirmBtn" class="btn btn-confirm">Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
