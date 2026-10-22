@@ -1,7 +1,7 @@
 // ============================================================
 // URL веб-приложения
 // ============================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbwUoXK-_rZUH0GYE81emVghdoxmM_Ufz9b2fb3jIg5nS9oHT2xK7OdOevDP25onHq1JnQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzUm-PXBXoSORZEc2Vy4GIdTe7Jt1bHL3lVbRjmZy6IFQ9O76FhR7Ry6381o3GwPqBtEA/exec';
 
 // ============================================================
 // Текущее действие: 'income' или 'withdraw'
@@ -10,70 +10,129 @@ let currentAction = null;
 let isProcessing = false;
 
 // ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================
+
+/**
+ * Безопасно получает JSON из ответа.
+ * Бросает понятную ошибку, если сервер вернул не JSON
+ * (например, HTML-страницу авторизации Google).
+ */
+async function fetchJson_(url, options) {
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        // Обрезаем, чтобы не засорять alert огромным HTML
+        const preview = text.slice(0, 200).replace(/\s+/g, ' ');
+        throw new Error(
+            `Сервер вернул не JSON (${contentType || 'без content-type'}). ` +
+            `Проверьте доступ "Все" у веб-приложения. Ответ: ${preview}`
+        );
+    }
+
+    return response.json();
+}
+
+/**
+ * Форматирует число как "1 234.56".
+ */
+function fmt_(value) {
+    const n = Number(value);
+    if (!isFinite(n)) return '—';
+    return n.toLocaleString('ru-RU', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+/**
+ * Ищет строку, в любой колонке которой есть точное совпадение с label.
+ * Возвращает { rowIndex, colIndex } или null.
+ *
+ * Пример: findIndicator_(data, 'Баланс')
+ *   → { rowIndex: 9, colIndex: 1 }, если в d[9][1] === 'Баланс'
+ */
+function findIndicator_(data, label) {
+    for (let i = 0; i < data.length; i++) {
+        const row = data[i] || [];
+        for (let j = 0; j < row.length; j++) {
+            if (String(row[j] || '').trim() === label) {
+                return { rowIndex: i, colIndex: j };
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Достаёт значение показателя по его названию.
+ * Берёт ячейку справа от label (colIndex + 1).
+ * Если её нет — возвращает '—'.
+ */
+function getIndicator_(data, label) {
+    const found = findIndicator_(data, label);
+    if (!found) return '—';
+    const row = data[found.rowIndex] || [];
+    const value = row[found.colIndex + 1];
+    return value == null || value === '' ? '—' : value;
+}
+
+// ============================================================
 // ЗАГРУЗКА ДАННЫХ
 // ============================================================
 
 async function loadData() {
     try {
-        const response = await fetch(API_URL);
-        const result = await response.json();
+        const result = await fetchJson_(API_URL);
 
         if (!result.success) {
             throw new Error(result.error || 'Ошибка сервера');
         }
 
-        console.log('✅ Данные:', result.data);
-
-        const d = result.data;
+        const d = result.data || [];
+        console.log('✅ Данные получены, строк:', d.length);
 
         // ============================================================
-        // Ищем строку с заголовком "Транзакции" во ВСЕХ колонках
+        // Вывод данных — берем значения из колонки C (индекс 2)
         // ============================================================
-        let headerRow = -1;
+        
+        // 1. Ищем метку и берем значение из соседней колонки
+        const budgetTotal = getIndicator_(d, 'Итого наш бюджет:'); // Строка 10, колонка C
+        const inCash      = getIndicator_(d, 'В наличии:');         // Строка 16, колонка C
+        const withdrawn   = getIndicator_(d, 'Снято:');             // Строка 15, колонка C
+        const monthlyRet  = getIndicator_(d, 'Месячный возврат:');  // Строка 17, колонка C
+
+          // 2. Особый случай: ищем текст в колонке B, а число берем из колонки C
+        let monthsLeft = '—';
         for (let i = 0; i < d.length; i++) {
-            for (let j = 0; j < d[i].length; j++) {
-                if (String(d[i][j] || '').trim() === 'Транзакции') {
-                    headerRow = i;
-                    break;
+            const cellText = String(d[i][1] || ''); // Колонка B (индекс 1)
+            
+            // Если нашли текст про месяцы
+            if (cellText.includes('До июня осталось месяцев:')) {
+                // Берем число из соседней ячейки справа (Колонка C, индекс 2)
+                const val = d[i][2]; 
+                if (val !== '' && val != null) {
+                    monthsLeft = val;
                 }
-            }
-            if (headerRow !== -1) break;
-        }
-
-        console.log('📍 Строка с заголовком "Транзакции":', headerRow);
-
-        // ============================================================
-        // Ищем последнюю транзакцию (максимальный ID)
-        // Долг берём из колонки D (индекс 3)
-        // ============================================================
-        let lastDebt = 0;
-        let lastTransaction = null;
-
-        if (headerRow !== -1) {
-            for (let i = headerRow + 1; i < d.length; i++) {
-                const id = parseInt(d[i][0]);
-                if (!isNaN(id) && id > 0) {
-                    lastTransaction = d[i];
-                    const debtValue = parseFloat(d[i][3]);
-                    if (!isNaN(debtValue)) {
-                        lastDebt = debtValue;
-                    }
-                }
+                break;
             }
         }
 
-        console.log('📊 Последний долг:', lastDebt);
-        console.log('📋 Последняя транзакция:', lastTransaction);
-
         // ============================================================
-        // Вывод данных
+        // Рендер
         // ============================================================
         document.querySelector('.budget').innerHTML = `
-            <div>💰 ${d[9][1]}  ${d[9][2]} $</div>
-            <div>✅ ${d[15][1]} ${d[15][2]} $</div>
-            <div>📉 ${d[14][1]} ${d[14][2]} $</div>
-            <div>📅 ${d[3][1]}  ${d[3][2]}</div>
-            <div>💵 ${d[16][1]} ${d[16][2]} $</div>            
+            <div>💰 ${fmt_(budgetTotal)} $</div>
+            <div>✅ ${fmt_(inCash)} $</div>
+            <div>📉 ${fmt_(withdrawn)} $</div>
+            <div>📅 ${monthsLeft} мес.</div>
+            <div>💵 ${fmt_(monthlyRet)} $</div>
         `;
 
     } catch (error) {
@@ -86,7 +145,7 @@ async function loadData() {
 // БЛОКИРОВКА / РАЗБЛОКИРОВКА КНОПОК
 // ============================================================
 
-function lockButtons(activeBtnId) {
+function lockButtons() {
     isProcessing = true;
 
     const incomeBtn = document.getElementById('incomeBtn');
@@ -135,12 +194,11 @@ async function addTransaction(amount, type) {
         const url = API_URL + '?action=addTransaction&amount=' + encodeURIComponent(signedAmount);
         console.log('📤 Отправка:', url);
 
-        const response = await fetch(url, {
+        const result = await fetchJson_(url, {
             method: 'GET',
-            mode: 'cors'
+            mode: 'cors',
         });
 
-        const result = await response.json();
         console.log('📥 Ответ:', result);
 
         if (!result.success) {
@@ -149,6 +207,7 @@ async function addTransaction(amount, type) {
 
         console.log('✅ Транзакция добавлена:', result);
 
+        // Небольшая пауза, чтобы Google успел пересчитать формулы
         await new Promise(resolve => setTimeout(resolve, 1200));
         await loadData();
 
@@ -192,7 +251,7 @@ async function confirmModal() {
     const input = document.getElementById('amountInput');
     const amount = parseFloat(input.value);
 
-    if (!amount || amount <= 0) {
+    if (!isFinite(amount) || amount <= 0) {
         alert('Введите сумму больше 0');
         return;
     }

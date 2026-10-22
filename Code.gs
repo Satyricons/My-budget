@@ -1,7 +1,3 @@
-
-## 📄 Файл: `apps-script/Code.gs`
-
-```javascript
 /*====================================================================================================================================*
   ImportJSON by Brad Jasper and Trevor Lohrbeer
   ====================================================================================================================================
@@ -231,6 +227,92 @@ function getDataFromNamedSheet_(sheetName) {
 }
 
 /* ============================================================
+   ОБЩАЯ ЛОГИКА ДОБАВЛЕНИЯ ТРАНЗАКЦИИ
+   ============================================================ */
+
+/**
+ * Добавляет новую транзакцию в лист.
+ * Возвращает объект с информацией о добавленной строке.
+ *
+ * @param {Sheet} sheet — лист Google Таблицы
+ * @param {number} amount — сумма (может быть отрицательной для снятия)
+ * @returns {{id: number, row: number, amount: number, date: string}}
+ */
+function addTransaction_(sheet, amount) {
+  const data = sheet.getDataRange().getValues();
+  let headerRow = -1;
+
+  // Ищем строку с заголовком "Транзакции"
+  for (let i = 0; i < data.length; i++) {
+    for (let j = 0; j < data[i].length; j++) {
+      if (String(data[i][j] || '').trim() === 'Транзакции') {
+        headerRow = i + 1; // 1-based
+        Logger.log('Найдена строка "Транзакции" в строке ' + headerRow + ', колонке ' + j);
+        break;
+      }
+    }
+    if (headerRow !== -1) break;
+  }
+
+  if (headerRow === -1) {
+    throw new Error('Не найдена строка "Транзакции"');
+  }
+
+  // Ищем последнюю транзакцию (максимальный ID) и её строку
+  let maxId = 0;
+  let lastRow = headerRow;
+
+  for (let i = headerRow; i < data.length; i++) {
+    const id = parseInt(data[i][0]);
+    if (!isNaN(id) && id > maxId) {
+      maxId = id;
+      lastRow = i + 1; // 1-based
+    }
+  }
+
+  const newId = maxId + 1;
+  const now = new Date();
+  const formattedDate = Utilities.formatDate(
+    now,
+    Session.getScriptTimeZone(),
+    'yyyy-MM-dd HH:mm:ss'
+  );
+
+  const newRow = lastRow + 1;
+
+  // Записываем A, B, C
+  sheet.getRange(newRow, 1).setValue(newId);
+  sheet.getRange(newRow, 2).setValue(formattedDate);
+  sheet.getRange(newRow, 3).setValue(amount);
+
+  // Копируем долг (колонка D) из предыдущей строки.
+  // Если там формула — копируем формулу (с относительной поправкой),
+  // если значение — копируем значение.
+  const debtPrevCell = sheet.getRange(lastRow, 4);
+  const debtNewCell  = sheet.getRange(newRow, 4);
+
+  const prevFormula = debtPrevCell.getFormula();
+  if (prevFormula) {
+    // setFormula автоматически сдвинет относительные ссылки
+    debtNewCell.setFormula(prevFormula);
+  } else {
+    const prevValue = debtPrevCell.getValue();
+    if (prevValue !== '' && prevValue != null) {
+      debtNewCell.setValue(prevValue);
+    }
+  }
+
+  Logger.log('✅ Добавлено: ID=' + newId + ', row=' + newRow + ', amount=' + amount);
+
+  return {
+    id: newId,
+    row: newRow,
+    amount: amount,
+    date: formattedDate,
+  };
+}
+
+/* ============================================================
    ВЕБ-ПРИЛОЖЕНИЕ: doGet
    ============================================================ */
 
@@ -249,57 +331,17 @@ function doGet(e) {
     if (params.action === 'addTransaction') {
       Logger.log('>>> Добавление новой транзакции');
 
-      const data = sheet.getDataRange().getValues();
-      let headerRow = -1;
-
-      for (let i = 0; i < data.length; i++) {
-        for (let j = 0; j < data[i].length; j++) {
-          if (String(data[i][j] || '').trim() === 'Транзакции') {
-            headerRow = i + 1;
-            Logger.log('Найдена строка "Транзакции" в строке ' + headerRow + ', колонке ' + j);
-            break;
-          }
-        }
-        if (headerRow !== -1) break;
-      }
-
-      if (headerRow === -1) {
-        Logger.log('❌ Строка "Транзакции" не найдена!');
-        throw new Error('Не найдена строка "Транзакции"');
-      }
-
-      let maxId = 0;
-      let lastRow = headerRow;
-
-      for (let i = headerRow; i < data.length; i++) {
-        const id = parseInt(data[i][0]);
-        if (!isNaN(id) && id > maxId) {
-          maxId = id;
-          lastRow = i + 1;
-        }
-      }
-
       const amount = parseFloat(params.amount) || 0;
-      const newId = maxId + 1;
-
-      const now = new Date();
-      const formattedDate = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-
-      const newRow = lastRow + 1;
-      sheet.getRange(newRow, 1).setValue(newId);
-      sheet.getRange(newRow, 2).setValue(formattedDate);
-      sheet.getRange(newRow, 3).setValue(amount);
-
-      Logger.log('✅ Добавлено: ID=' + newId + ', row=' + newRow + ', amount=' + amount);
+      const created = addTransaction_(sheet, amount);
 
       return ContentService
         .createTextOutput(JSON.stringify({
           success: true,
           message: 'Транзакция добавлена',
-          id: newId,
-          row: newRow,
-          amount: amount,
-          date: formattedDate
+          id: created.id,
+          row: created.row,
+          amount: created.amount,
+          date: created.date,
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -313,7 +355,7 @@ function doGet(e) {
         data: data,
         sheetName: sheet.getName(),
         totalRows: data.length,
-        totalCols: data[0] ? data[0].length : 0
+        totalCols: data[0] ? data[0].length : 0,
       }))
       .setMimeType(ContentService.MimeType.JSON);
 
@@ -322,7 +364,7 @@ function doGet(e) {
     return ContentService
       .createTextOutput(JSON.stringify({
         success: false,
-        error: error.toString()
+        error: error.toString(),
       }))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -335,64 +377,30 @@ function doGet(e) {
 function doPost(e) {
   try {
     let params;
-    
+
     if (e.postData && e.postData.type === 'application/json') {
       params = JSON.parse(e.postData.contents);
     } else {
       params = e.parameter || {};
     }
-    
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(params.sheetName || 'Лист1');
 
     if (!sheet) throw new Error('Лист не найден');
 
     if (params.action === 'addTransaction') {
-      const data = sheet.getDataRange().getValues();
-      let headerRow = -1;
-
-      for (let i = 0; i < data.length; i++) {
-        for (let j = 0; j < data[i].length; j++) {
-          if (String(data[i][j] || '').trim() === 'Транзакции') {
-            headerRow = i + 1;
-            break;
-          }
-        }
-        if (headerRow !== -1) break;
-      }
-
-      if (headerRow === -1) throw new Error('Не найдена строка "Транзакции"');
-
-      let maxId = 0;
-      let lastRow = headerRow;
-
-      for (let i = headerRow; i < data.length; i++) {
-        const id = parseInt(data[i][0]);
-        if (!isNaN(id) && id > maxId) {
-          maxId = id;
-          lastRow = i + 1;
-        }
-      }
-
       const amount = parseFloat(params.amount) || 0;
-      const newId = maxId + 1;
-
-      const now = new Date();
-      const formattedDate = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-
-      const newRow = lastRow + 1;
-      sheet.getRange(newRow, 1).setValue(newId);
-      sheet.getRange(newRow, 2).setValue(formattedDate);
-      sheet.getRange(newRow, 3).setValue(amount);
+      const created = addTransaction_(sheet, amount);
 
       return ContentService
         .createTextOutput(JSON.stringify({
           success: true,
           message: 'Транзакция добавлена',
-          id: newId,
-          row: newRow,
-          amount: amount,
-          date: formattedDate
+          id: created.id,
+          row: created.row,
+          amount: created.amount,
+          date: created.date,
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -403,7 +411,7 @@ function doPost(e) {
     return ContentService
       .createTextOutput(JSON.stringify({
         success: false,
-        error: error.toString()
+        error: error.toString(),
       }))
       .setMimeType(ContentService.MimeType.JSON);
   }
