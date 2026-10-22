@@ -5,17 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мой бюджет</title>
     <link rel="stylesheet" href="style.css">
-    <script src="main.js" defer></script>
+    <!-- Модули грузятся отложенно, defer не нужен, type="module" делает это сам -->
+    <script src="api.js" type="module"></script>
+    <script src="main.js" type="module"></script>
 </head>
 <body>
+    <!-- Шапка сайта -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">💰 Семейный бюджет</div>
+            <div class="exchange-rates">Курс: $ .. | РР: ..</div>
+        </div>
+    </header>
 
-    <div class="container">
-        <h1>💰 Семейный бюджет</h1>
-
-        <!-- Баланс -->
+    <!-- Основной контент -->
+    <main class="container">
         <div class="budget">Загрузка...</div>
 
-        <!-- Кнопки -->
         <div class="actions">
             <button id="incomeBtn" class="btn btn-income">➕ Пополнить</button>
             <button id="withdrawBtn" class="btn btn-withdraw">➖ Снять</button>
@@ -33,7 +39,16 @@
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
+    <!-- Подвал сайта (навигация) -->
+    <footer class="footer">
+        <nav class="footer-nav">
+            <a href="#" class="active">Главная</a>
+            <a href="#">Платежи</a>
+            <a href="#">Журнал</a>
+            <a href="#">Финансы</a>
+        </nav>
+    </footer>
 </body>
 </html>

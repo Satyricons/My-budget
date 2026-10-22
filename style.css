@@ -8,24 +8,57 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #f0f2f5;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    margin: 0;
-    padding: 20px;
+    flex-direction: column;
+    min-height: 100vh; /* На всю высоту экрана */
 }
 
+/* ============================================================
+   Шапка (Header)
+   ============================================================ */
+.header {
+    background-color: #ffffff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    padding: 15px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+.exchange-rates {
+    font-size: 14px;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+/* ============================================================
+   Основной контент (Main)
+   ============================================================ */
 .container {
     max-width: 1000px;
     width: 100%;
-}
-
-h1 {
-    font-size: 24px;
-    font-weight: 400;
-    margin-bottom: 20px;
-    color: #1a1a2e;
-    text-align: center;
+    margin: 0 auto;
+    padding: 40px 20px;
+    flex: 1; /* Растягивает контейнер, прижимая футер к низу */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Центрируем контент по вертикали */
 }
 
 .budget {
@@ -37,6 +70,9 @@ h1 {
     font-weight: 500;
     color: #1a1a2e;
     margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Отступы между строчками баланса */
 }
 
 /* Кнопки */
@@ -78,7 +114,9 @@ h1 {
     background: #b91c1c;
 }
 
-/* Модальное окно */
+/* ============================================================
+   Модальное окно
+   ============================================================ */
 .modal {
     position: fixed;
     top: 0;
@@ -158,28 +196,67 @@ h1 {
     background: #2d2d44;
 }
 
-/* ============================================================
-   Заблокированные кнопки
-   ============================================================ */
-
+/* Заблокированные кнопки */
 .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
 }
 
-.btn-income:disabled {
-    background: #16a34a;
+/* ============================================================
+   Подвал (Footer)
+   ============================================================ */
+.footer {
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
+    width: 100%;
+    padding: 15px 20px;
+    margin-top: auto; /* Прижимает к низу */
 }
 
-.btn-withdraw:disabled {
-    background: #dc2626;
+.footer-nav {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
 }
 
-.btn-confirm:disabled {
-    background: #1a1a2e;
+.footer-nav a {
+    text-decoration: none;
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s;
 }
 
-.btn-cancel:disabled {
-    background: #e5e7eb;
+.footer-nav a:hover,
+.footer-nav a.active {
+    color: #1a1a2e;
+    background: #f3f4f6;
+}
+
+/* ============================================================
+   Адаптивность для мобильных
+   ============================================================ */
+@media (max-width: 600px) {
+    .budget {
+        padding: 20px 30px;
+        font-size: 24px;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+    }
 }
