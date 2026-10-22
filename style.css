@@ -10,6 +10,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh; /* На всю высоту экрана */
+    justify-content: space-between;
 }
 
 /* ============================================================
@@ -54,8 +55,9 @@ body {
     max-width: 1000px;
     width: 100%;
     margin: 0 auto;
-    padding: 40px 20px;
-    flex: 1; /* Растягивает контейнер, прижимая футер к низу */
+    padding-left: 20px;
+    padding-right: 20px;
+    /* flex: 1;  Растягивает контейнер, прижимая футер к низу */
     display: flex;
     flex-direction: column;
     justify-content: center; /* Центрируем контент по вертикали */
@@ -211,7 +213,8 @@ body {
     border-top: 1px solid #e5e7eb;
     width: 100%;
     padding: 15px 20px;
-    margin-top: auto; /* Прижимает к низу */
+    /* margin-top: auto;  */
+    /* Прижимает к низу */
 }
 
 .footer-nav {
